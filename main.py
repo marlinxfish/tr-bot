@@ -147,7 +147,13 @@ def generate_random_email(name):
     domain = random.choice(domains)
     return f"{clean_name}{random_num}@{domain}"
 
-def run_automation(is_headless, akun_dibuat=0):
+def run_automation(is_headless, akun_dibuat=0, env_mode='local'):
+    multiplier = 1.5 if env_mode == 'vps' else 1.0
+    delay_short = int(2000 * multiplier)
+    delay_medium = int(5000 * multiplier)
+    delay_long = int(10000 * multiplier)
+    timeout_max = int(60000 * multiplier)
+    
     best_proxy = get_random_proxy()
     
     proxy_config = None
@@ -170,16 +176,17 @@ def run_automation(is_headless, akun_dibuat=0):
             geoip=True if best_proxy else False 
         ) as browser:
             page = browser.new_page()
+            page.set_default_timeout(timeout_max)
             
             log_info(f"Membuka website {BASE_DOMAIN}...")
             page.goto(f"https://{BASE_DOMAIN}/")
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(delay_short)
             
             page.get_by_role("link", name="Dashboard →").click()
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(delay_short)
             
             page.get_by_role("link", name="Create account").click()
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(delay_short)
             
             log_info("Mengisi formulir pendaftaran...")
             page.get_by_role("textbox", name="Name (optional)").click()
@@ -190,13 +197,13 @@ def run_automation(is_headless, akun_dibuat=0):
             
             page.get_by_role("button", name="Create Account").click()
             
-            log_info("Menunggu pembuatan akun selesai (delay 10 detik)...")
-            page.wait_for_timeout(10000)
+            log_info(f"Menunggu pembuatan akun selesai (delay {int(delay_long/1000)} detik)...")
+            page.wait_for_timeout(delay_long)
             account_created = True
             
             log_info("Membuka halaman login...")
             page.goto(f"https://dashboard.{BASE_DOMAIN}/login")
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(delay_short)
             
             log_info("Proses Login...")
             page.get_by_role("textbox", name="Email").click()
@@ -207,15 +214,15 @@ def run_automation(is_headless, akun_dibuat=0):
             page.get_by_role("textbox", name="Password").fill(password)
             page.get_by_role("textbox", name="Password").press("Tab")
             
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(int(1000 * multiplier))
             page.get_by_role("button", name="Sign In").click()
             
-            log_info("Menunggu proses login (delay 5 detik)...")
-            page.wait_for_timeout(5000)
+            log_info(f"Menunggu proses login (delay {int(delay_medium/1000)} detik)...")
+            page.wait_for_timeout(delay_medium)
             
             log_info("Membuka dashboard activity...")
             page.goto(f"https://dashboard.{BASE_DOMAIN}/activity")
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(delay_short)
             
             log_info("Membuat API Key baru...")
             page.get_by_role("link", name="Create API Key").click()
@@ -226,7 +233,7 @@ def run_automation(is_headless, akun_dibuat=0):
             page.get_by_role("button", name="Create Key").click()
             
             log_info("Menyalin API Key...")
-            page.wait_for_selector("text=/sk-.*/", timeout=10000)
+            page.wait_for_selector("text=/sk-.*/", timeout=timeout_max)
             
             api_key_element = page.locator("text=/sk-.*/").first
             api_key = api_key_element.inner_text().strip()
@@ -266,6 +273,9 @@ if __name__ == "__main__":
     pilihan = input("Jalankan bot secara Headless (sembunyikan browser)? [y/n]: ").strip().lower()
     is_headless = pilihan == 'y'
 
+    pilihan_env = input("Jalankan bot di (1) Local atau (2) VPS (Low Spec)? [1/2]: ").strip()
+    env_mode = 'vps' if pilihan_env == '2' else 'local'
+
 
     if bot:
         import threading
@@ -280,7 +290,7 @@ if __name__ == "__main__":
         try:
             akun_dibuat += 1
             print(f"\n\033[93m>>> --- Memulai Proses Untuk Akun Ke-{akun_dibuat} ---\033[0m")
-            run_automation(is_headless, akun_dibuat)
+            run_automation(is_headless, akun_dibuat, env_mode)
             log_info("Jeda 3 detik sebelum lanjut ke akun berikutnya...")
             time.sleep(3)
         except KeyboardInterrupt:
