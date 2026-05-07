@@ -26,11 +26,6 @@ USERS_FILE = os.path.join(RESULT_DIR, "user.txt")
 os.makedirs(RESULT_DIR, exist_ok=True)
 
 def format_proxy_string(proxy_str):
-    """
-    Parses proxies that might be in the format: protocol://ip:port:user:pass
-    and converts them to standard format: protocol://user:pass@ip:port
-    Supports http, https, socks4, socks5.
-    """
     proxy_str = proxy_str.strip()
     
     protocol = "http"
@@ -42,38 +37,19 @@ def format_proxy_string(proxy_str):
     parts = rest.split(":")
     if len(parts) == 4:
         ip, port, user, pwd = parts
-        return f"{protocol}://{user}:{pwd}@{ip}:{port}"
+        return {
+            "server": f"{protocol}://{ip}:{port}",
+            "username": user,
+            "password": pwd
+        }
     elif len(parts) == 2:
         ip, port = parts
-        return f"{protocol}://{ip}:{port}"
+        return {"server": f"{protocol}://{ip}:{port}"}
         
-    return proxy_str
+    return {"server": proxy_str}
 
-def check_proxy(original_proxy_url):
-    """
-    Checks the proxy latency and location.
-    Returns (latency_ms, geo_info, formatted_proxy) if successful, None if failed.
-    """
-    formatted_proxy = format_proxy_string(original_proxy_url)
-    proxies = {
-        "http": formatted_proxy,
-        "https": formatted_proxy,
-    }
-    start_time = time.time()
-    try:
-        response = requests.get("http://ip-api.com/json/", proxies=proxies, timeout=10)
-        response.raise_for_status()
-        latency = int((time.time() - start_time) * 1000)
-        data = response.json()
-        if data.get("status") == "success":
-            location = f"{data.get('city')}, {data.get('country')}"
-            return latency, location, formatted_proxy
-        return latency, "Unknown Location", formatted_proxy
-    except Exception as e:
-        return None
-
-def get_best_proxy():
-    """Reads proxies from proxy.txt, checks them, and returns the fastest one."""
+def get_random_proxy():
+    """Reads proxies from proxy.txt and returns one random proxy without checking."""
     if not os.path.exists(PROXY_FILE):
         return None
 
@@ -81,36 +57,13 @@ def get_best_proxy():
         proxies = [line.strip() for line in f if line.strip()]
 
     if not proxies:
+        print("Tidak ada proxy di file proxy.txt. Menggunakan direct connection.")
         return None
 
-    print(f"Mengecek {len(proxies)} proxy...")
-    
-    valid_proxies = []
-    
-    with ThreadPoolExecutor(max_workers=min(10, len(proxies))) as executor:
-        results = executor.map(check_proxy, proxies)
-        
-        for proxy, result in zip(proxies, results):
-            if result:
-                latency, location, formatted = result
-                valid_proxies.append({
-                    "original": proxy,
-                    "formatted": formatted,
-                    "latency": latency,
-                    "location": location
-                })
-                print(f"[OK] {proxy} - {latency}ms - {location}")
-            else:
-                print(f"[FAIL] {proxy}")
-
-    if not valid_proxies:
-        print("Tidak ada proxy yang jalan. Menggunakan direct connection.")
-        return None
-
-    valid_proxies.sort(key=lambda x: x["latency"])
-    best_proxy = valid_proxies[0]
-    print(f"\nProxy tercepat yang dipilih: {best_proxy['original']} ({best_proxy['latency']}ms, {best_proxy['location']})")
-    return best_proxy['formatted']
+    random_proxy = random.choice(proxies)
+    formatted_proxy = format_proxy_string(random_proxy)
+    print(f"\nProxy acak yang dipilih: {random_proxy}")
+    return formatted_proxy
 
 def write_result(email, password, api_key):
     file_exists = os.path.exists(KEYS_FILE)
@@ -137,11 +90,11 @@ def generate_random_email(name):
 def run_automation(is_headless):
     print("\n--- Memulai Bot Pembuat Akun TheRouter.ai ---")
     
-    best_proxy = get_best_proxy()
+    best_proxy = get_random_proxy()
     
     proxy_config = None
     if best_proxy:
-        proxy_config = {"server": best_proxy}
+        proxy_config = best_proxy
         
     name = generate_random_name()
     email = generate_random_email(name)
