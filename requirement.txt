@@ -1,0 +1,5 @@
+camoufox
+playwright
+Faker
+camoufox[geoip]
+dotenv
