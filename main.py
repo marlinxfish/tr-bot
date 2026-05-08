@@ -46,6 +46,8 @@ os.makedirs(RESULT_DIR, exist_ok=True)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_USER_ID = os.getenv("TELEGRAM_USER_ID", "")
 
+bot_running = False if TELEGRAM_BOT_TOKEN else True
+
 try:
     import telebot
     bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN) if TELEGRAM_BOT_TOKEN else None
@@ -53,6 +55,30 @@ except ImportError:
     bot = None
 
 if bot:
+    @bot.message_handler(commands=['start'])
+    def handle_start(message):
+        global bot_running
+        if str(message.chat.id) != str(TELEGRAM_USER_ID):
+            return
+        if not bot_running:
+            bot_running = True
+            bot.reply_to(message, "▶️ Bot otomatisasi telah dijalankan.")
+            log_info("Bot diaktifkan via Telegram.")
+        else:
+            bot.reply_to(message, "⚠️ Bot sudah dalam keadaan berjalan.")
+
+    @bot.message_handler(commands=['stop'])
+    def handle_stop(message):
+        global bot_running
+        if str(message.chat.id) != str(TELEGRAM_USER_ID):
+            return
+        if bot_running:
+            bot_running = False
+            bot.reply_to(message, "⏸️ Bot otomatisasi dihentikan. (Akan berhenti setelah proses saat ini selesai)")
+            log_info("Bot dihentikan via Telegram.")
+        else:
+            bot.reply_to(message, "⚠️ Bot sudah dalam keadaan berhenti.")
+
     @bot.message_handler(commands=['total', 'jumlah'])
     def handle_total(message):
         if str(message.chat.id) != str(TELEGRAM_USER_ID):
@@ -281,13 +307,20 @@ if __name__ == "__main__":
         import threading
         tg_thread = threading.Thread(target=run_telegram_bot, daemon=True)
         tg_thread.start()
-        log_info("Telegram bot listener aktif.")
+        log_info("Telegram bot listener aktif. Kirim /start dari Telegram untuk menjalankan.")
+        if not bot_running:
+            log_info("Menunggu perintah /start dari Telegram...")
 
-    log_info("Memulai loop pembuatan akun tanpa henti. Tekan Ctrl+C untuk berhenti.")
+    if not bot:
+        log_info("Memulai loop pembuatan akun tanpa henti. Tekan Ctrl+C untuk berhenti.")
     
     akun_dibuat = 0
     while True:
         try:
+            if not bot_running:
+                time.sleep(1)
+                continue
+
             akun_dibuat += 1
             print(f"\n\033[93m>>> --- Memulai Proses Untuk Akun Ke-{akun_dibuat} ---\033[0m")
             run_automation(is_headless, akun_dibuat, env_mode)
